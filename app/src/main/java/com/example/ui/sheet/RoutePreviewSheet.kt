@@ -19,14 +19,13 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsBike
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DirectionsBike
 import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.DirectionsWalk
-import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.Navigation
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -132,8 +131,8 @@ fun RoutePreviewSheet(
       ) {
         listOf(
           Triple(TravelMode.DRIVING, Icons.Default.DirectionsCar, "Drive"),
-          Triple(TravelMode.CYCLING, Icons.Default.DirectionsBike, "Bike"),
-          Triple(TravelMode.WALKING, Icons.Default.DirectionsWalk, "Walk")
+          Triple(TravelMode.CYCLING, Icons.AutoMirrored.Filled.DirectionsBike, "Bike"),
+          Triple(TravelMode.WALKING, Icons.AutoMirrored.Filled.DirectionsWalk, "Walk")
         ).forEach { (mode, icon, label) ->
           FilterChip(
             selected = travelMode == mode,
@@ -196,7 +195,7 @@ fun RoutePreviewSheet(
 
             TextButton(onClick = { showItinerary = !showItinerary }) {
               Icon(
-                imageVector = Icons.Default.FormatListBulleted,
+                imageVector = Icons.AutoMirrored.Filled.FormatListBulleted,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp)
               )

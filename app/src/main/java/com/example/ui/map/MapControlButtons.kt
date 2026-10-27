@@ -7,10 +7,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddLocation
 import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.FloatingActionButton
@@ -64,7 +64,7 @@ fun MapControlButtons(
         .size(48.dp)
         .testTag("fab_view_objects")
     ) {
-      Icon(Icons.Default.List, contentDescription = "View Map Objects")
+      Icon(Icons.AutoMirrored.Filled.List, contentDescription = "View Map Objects")
     }
 
     // Layers Button

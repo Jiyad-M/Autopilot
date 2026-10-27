@@ -9,8 +9,13 @@ on:
 
 jobs:
   build:
-    name: Build Debug APK
+    name: Build Android APK
     runs-on: ubuntu-latest
+
+    env:
+      STORE_PASSWORD: "android"
+      KEY_PASSWORD: "android"
+      KEYSTORE_PATH: "my-upload-key.jks"
 
     steps:
       - name: Checkout repository
@@ -21,7 +26,6 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: 'gradle'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -42,16 +46,21 @@ jobs:
             base64 -d debug.keystore.base64 > debug.keystore
           fi
 
+          # Ensure release upload keystore exists
+          if [ ! -f my-upload-key.jks ]; then
+            keytool -genkeypair -v -keystore my-upload-key.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=LeafletNav, OU=Android, O=Leaflet, L=City, S=State, C=US"
+          fi
+
           # Make gradlew executable
           chmod +x ./gradlew || true
 
-      - name: Build APK with Gradle
-        run: ./gradlew assembleDebug --stacktrace
+      - name: Build APKs with Gradle
+        run: ./gradlew assembleDebug assembleRelease --stacktrace
 
-      - name: Upload Debug APK
+      - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: LeafletNav-Debug-APK
-          path: app/build/outputs/apk/debug/*.apk
+          name: LeafletNav-APKs
+          path: app/build/outputs/apk/**/*.apk
           retention-days: 30
           if-no-files-found: error

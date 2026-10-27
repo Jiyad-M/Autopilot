@@ -21,7 +21,7 @@ abstract class AppDatabase : RoomDatabase() {
           AppDatabase::class.java,
           "leaflet_nav_db"
         )
-          .fallbackToDestructiveMigration()
+          .fallbackToDestructiveMigration(true)
           .build()
         INSTANCE = instance
         instance

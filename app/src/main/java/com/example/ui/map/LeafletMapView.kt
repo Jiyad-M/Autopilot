@@ -53,7 +53,6 @@ fun LeafletMapView(
       settings.apply {
         javaScriptEnabled = true
         domStorageEnabled = true
-        databaseEnabled = true
         loadWithOverviewMode = true
         useWideViewPort = true
         cacheMode = WebSettings.LOAD_DEFAULT
