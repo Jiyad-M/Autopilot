@@ -1,0 +1,6 @@
+{
+  "name": "Leaflet Nav",
+  "description": "Turn-by-turn map navigation powered by Leaflet, OpenStreetMap, and OSRM routing with real-time route guidance and simulation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
