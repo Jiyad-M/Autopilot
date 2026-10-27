@@ -84,6 +84,5 @@ data class NavigationProgress(
   val remainingDurationSeconds: Double,
   val currentSpeedKmh: Double,
   val currentHeading: Float,
-  val currentLocation: LatLng,
-  val isSimulation: Boolean = false
+  val currentLocation: LatLng
 )

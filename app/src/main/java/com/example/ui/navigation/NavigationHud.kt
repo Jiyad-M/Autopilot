@@ -22,8 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.RotateLeft
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Close
@@ -37,22 +36,15 @@ import androidx.compose.material.icons.filled.TurnLeft
 import androidx.compose.material.icons.filled.TurnRight
 import androidx.compose.material.icons.filled.TurnSlightLeft
 import androidx.compose.material.icons.filled.TurnSlightRight
-import androidx.compose.material.icons.automirrored.filled.RotateLeft
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -76,11 +68,8 @@ import java.util.Locale
 fun NavigationHud(
   navStatus: NavigationStatus,
   progress: NavigationProgress?,
-  isSimulating: Boolean,
-  simulationSpeed: Float,
   isMuted: Boolean,
   isFollowingUser: Boolean,
-  onSpeedSelected: (Float) -> Unit,
   onToggleMute: () -> Unit,
   onToggleFollow: () -> Unit,
   onRecenter: () -> Unit,
@@ -107,7 +96,7 @@ fun NavigationHud(
       }
     }
 
-    // Bottom Navigation Bar
+    // Bottom Navigation Dashboard
     AnimatedVisibility(
       visible = navStatus == NavigationStatus.NAVIGATING && progress != null,
       enter = slideInVertically { it } + fadeIn(),
@@ -120,11 +109,8 @@ fun NavigationHud(
       if (progress != null) {
         BottomNavigationDashboard(
           progress = progress,
-          isSimulating = isSimulating,
-          simulationSpeed = simulationSpeed,
           isMuted = isMuted,
           isFollowingUser = isFollowingUser,
-          onSpeedSelected = onSpeedSelected,
           onToggleMute = onToggleMute,
           onToggleFollow = onToggleFollow,
           onRecenter = onRecenter,
@@ -150,7 +136,7 @@ fun NavigationHud(
           }
         },
         text = {
-          Text("You have reached your destination. Thank you for navigating with Leaflet Nav.")
+          Text("You have reached your destination safely.")
         },
         confirmButton = {
           Button(
@@ -261,11 +247,8 @@ fun TopInstructionCard(
 @Composable
 fun BottomNavigationDashboard(
   progress: NavigationProgress,
-  isSimulating: Boolean,
-  simulationSpeed: Float,
   isMuted: Boolean,
   isFollowingUser: Boolean,
-  onSpeedSelected: (Float) -> Unit,
   onToggleMute: () -> Unit,
   onToggleFollow: () -> Unit,
   onRecenter: () -> Unit,
@@ -285,7 +268,6 @@ fun BottomNavigationDashboard(
         .fillMaxWidth()
         .padding(16.dp)
     ) {
-      // Top row: ETA, Remaining Time, Remaining Distance, Speed
       val etaTime = remember(progress.remainingDurationSeconds) {
         val arrivalMillis = System.currentTimeMillis() + (progress.remainingDurationSeconds * 1000).toLong()
         SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(arrivalMillis))
@@ -318,7 +300,7 @@ fun BottomNavigationDashboard(
           )
         }
 
-        // Speed badge
+        // Real speed badge
         Surface(
           shape = RoundedCornerShape(12.dp),
           color = Color(0xFF1E293B)
@@ -344,47 +326,14 @@ fun BottomNavigationDashboard(
         }
       }
 
-      // Simulation Speed Controls (if simulating)
-      if (isSimulating) {
-        Spacer(modifier = Modifier.height(10.dp))
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-          Text(
-            text = "Sim Speed:",
-            color = Color(0xFF94A3B8),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium
-          )
-          listOf(1f, 2f, 4f).forEach { speed ->
-            FilterChip(
-              selected = simulationSpeed == speed,
-              onClick = { onSpeedSelected(speed) },
-              label = { Text("${speed.toInt()}x", fontSize = 12.sp) },
-              colors = FilterChipDefaults.filterChipColors(
-                selectedContainerColor = Color(0xFF0284C7),
-                selectedLabelColor = Color.White,
-                containerColor = Color(0xFF1E293B),
-                labelColor = Color(0xFF94A3B8)
-              ),
-              shape = RoundedCornerShape(8.dp),
-              modifier = Modifier.height(32.dp)
-            )
-          }
-        }
-      }
-
       Spacer(modifier = Modifier.height(14.dp))
 
-      // Action buttons row: Stop (Red), Follow Camera, Mute, Recenter
+      // Action buttons: End Route, Follow Camera, Mute, Recenter
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
       ) {
-        // Red Exit / Stop Route button
         Button(
           onClick = onStopNavigation,
           colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
@@ -397,7 +346,6 @@ fun BottomNavigationDashboard(
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          // Camera follow
           IconButton(
             onClick = onToggleFollow,
             modifier = Modifier
@@ -412,7 +360,6 @@ fun BottomNavigationDashboard(
             )
           }
 
-          // Audio Mute toggle
           IconButton(
             onClick = onToggleMute,
             modifier = Modifier
@@ -427,7 +374,6 @@ fun BottomNavigationDashboard(
             )
           }
 
-          // Recenter
           IconButton(
             onClick = onRecenter,
             modifier = Modifier

@@ -8,7 +8,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddLocation
 import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.FloatingActionButton
@@ -28,6 +30,8 @@ fun MapControlButtons(
   onZoomOut: () -> Unit,
   onRecenter: () -> Unit,
   onOpenLayers: () -> Unit,
+  onAddObject: () -> Unit,
+  onOpenObjectsList: () -> Unit,
   modifier: Modifier = Modifier
 ) {
   Column(
@@ -35,6 +39,34 @@ fun MapControlButtons(
     verticalArrangement = Arrangement.spacedBy(10.dp),
     horizontalAlignment = Alignment.End
   ) {
+    // Add Map Object FAB (Highlighted in Primary Cyan)
+    FloatingActionButton(
+      onClick = onAddObject,
+      shape = CircleShape,
+      containerColor = MaterialTheme.colorScheme.primaryContainer,
+      contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+      elevation = FloatingActionButtonDefaults.elevation(5.dp),
+      modifier = Modifier
+        .size(48.dp)
+        .testTag("fab_add_object")
+    ) {
+      Icon(Icons.Default.AddLocation, contentDescription = "Add Object to Map")
+    }
+
+    // View All Map Objects FAB
+    FloatingActionButton(
+      onClick = onOpenObjectsList,
+      shape = CircleShape,
+      containerColor = MaterialTheme.colorScheme.surface,
+      contentColor = MaterialTheme.colorScheme.onSurface,
+      elevation = FloatingActionButtonDefaults.elevation(4.dp),
+      modifier = Modifier
+        .size(48.dp)
+        .testTag("fab_view_objects")
+    ) {
+      Icon(Icons.Default.List, contentDescription = "View Map Objects")
+    }
+
     // Layers Button
     FloatingActionButton(
       onClick = onOpenLayers,

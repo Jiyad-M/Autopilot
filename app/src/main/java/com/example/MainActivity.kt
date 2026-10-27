@@ -31,7 +31,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.NavigationStatus
+import com.example.ui.dialogs.AddMapObjectDialog
 import com.example.ui.dialogs.LayerSelectionDialog
+import com.example.ui.dialogs.ManageMapObjectsSheet
+import com.example.ui.dialogs.MapObjectDetailSheet
 import com.example.ui.map.LeafletMapView
 import com.example.ui.map.MapControlButtons
 import com.example.ui.navigation.NavigationHud
@@ -62,11 +65,13 @@ fun LeafletNavigationApp(viewModel: NavigationViewModel) {
   val context = LocalContext.current
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   val savedPlaces by viewModel.savedPlaces.collectAsStateWithLifecycle(initialValue = emptyList())
+  val mapObjects by viewModel.mapObjects.collectAsStateWithLifecycle(initialValue = emptyList())
   val scope = rememberCoroutineScope()
   val snackbarHostState = remember { SnackbarHostState() }
 
   var showLayersDialog by remember { mutableStateOf(false) }
   var showSavedPlacesSheet by remember { mutableStateOf(false) }
+  var showManageObjectsSheet by remember { mutableStateOf(false) }
 
   // Location permission request launcher
   val permissionLauncher = rememberLauncherForActivityResult(
@@ -93,8 +98,19 @@ fun LeafletNavigationApp(viewModel: NavigationViewModel) {
   }
 
   // Handle Android Back Navigation
-  BackHandler(enabled = uiState.navStatus != NavigationStatus.IDLE || uiState.searchResults.isNotEmpty()) {
+  BackHandler(
+    enabled = uiState.navStatus != NavigationStatus.IDLE ||
+        uiState.searchResults.isNotEmpty() ||
+        uiState.selectedMapObject != null ||
+        uiState.isAddObjectDialogOpen
+  ) {
     when {
+      uiState.selectedMapObject != null -> {
+        viewModel.clearSelectedMapObject()
+      }
+      uiState.isAddObjectDialogOpen -> {
+        viewModel.closeAddObjectDialog()
+      }
       uiState.navStatus == NavigationStatus.NAVIGATING -> {
         viewModel.stopNavigation()
       }
@@ -139,13 +155,15 @@ fun LeafletNavigationApp(viewModel: NavigationViewModel) {
         )
       }
 
-      // Map Controls (Zoom In/Out, Recenter, Layers)
+      // Map Controls (Zoom In/Out, Recenter, Layers, Add Object, Objects List)
       if (uiState.navStatus != NavigationStatus.NAVIGATING) {
         MapControlButtons(
           onZoomIn = { viewModel.zoomIn() },
           onZoomOut = { viewModel.zoomOut() },
           onRecenter = { viewModel.recenterMap() },
           onOpenLayers = { showLayersDialog = true },
+          onAddObject = { viewModel.openAddObjectDialog() },
+          onOpenObjectsList = { showManageObjectsSheet = true },
           modifier = Modifier
             .align(Alignment.CenterEnd)
             .padding(bottom = if (uiState.navStatus == NavigationStatus.ROUTE_PREVIEW) 260.dp else 40.dp)
@@ -161,8 +179,7 @@ fun LeafletNavigationApp(viewModel: NavigationViewModel) {
           routeInfo = uiState.routeInfo,
           isCalculating = uiState.isCalculatingRoute,
           onModeSelected = { viewModel.setTravelMode(it) },
-          onStartNavigation = { viewModel.startNavigation(isSimulation = false) },
-          onStartSimulation = { viewModel.startNavigation(isSimulation = true) },
+          onStartNavigation = { viewModel.startNavigation() },
           onSavePlace = {
             val destLoc = uiState.destinationLocation
             val destName = uiState.destinationName
@@ -176,20 +193,69 @@ fun LeafletNavigationApp(viewModel: NavigationViewModel) {
         )
       }
 
-      // Active Turn-by-Turn Navigation HUD (Top Maneuvers & Bottom Dashboard)
+      // Active Turn-by-Turn Navigation HUD (Live GPS)
       NavigationHud(
         navStatus = uiState.navStatus,
         progress = uiState.navProgress,
-        isSimulating = uiState.isSimulating,
-        simulationSpeed = uiState.simulationSpeed,
         isMuted = uiState.isMuted,
         isFollowingUser = uiState.isFollowingUser,
-        onSpeedSelected = { viewModel.setSimulationSpeed(it) },
         onToggleMute = { viewModel.toggleMute() },
         onToggleFollow = { viewModel.toggleFollowUser() },
         onRecenter = { viewModel.recenterMap() },
         onStopNavigation = { viewModel.stopNavigation() }
       )
+
+      // Add Object to Map Sheet/Modal
+      if (uiState.isAddObjectDialogOpen) {
+        val targetLocation = uiState.pendingObjectLocation ?: uiState.userLocation
+        AddMapObjectDialog(
+          location = targetLocation,
+          onSave = { title, desc, type, lat, lng, radius, color ->
+            viewModel.saveMapObject(title, desc, type, lat, lng, radius, color)
+            Toast.makeText(context, "Added object to map!", Toast.LENGTH_SHORT).show()
+          },
+          onDismiss = { viewModel.closeAddObjectDialog() }
+        )
+      }
+
+      // Map Object Detail Sheet (when tapping any object on map or list)
+      uiState.selectedMapObject?.let { selectedObj ->
+        MapObjectDetailSheet(
+          mapObject = selectedObj,
+          onNavigateTo = { obj ->
+            viewModel.clearSelectedMapObject()
+            viewModel.selectDestination(obj.toLatLng(), obj.title)
+          },
+          onDelete = { obj ->
+            viewModel.deleteMapObject(obj)
+            Toast.makeText(context, "Object deleted", Toast.LENGTH_SHORT).show()
+          },
+          onDismiss = { viewModel.clearSelectedMapObject() }
+        )
+      }
+
+      // Manage Map Objects Sheet
+      if (showManageObjectsSheet) {
+        ManageMapObjectsSheet(
+          objects = mapObjects,
+          onObjectSelected = { obj ->
+            showManageObjectsSheet = false
+            viewModel.onMapObjectClick(obj.id, obj.title, obj.objectType, obj.latitude, obj.longitude)
+            viewModel.onMapCommand?.invoke("setCenter(${obj.latitude}, ${obj.longitude}, 16)")
+          },
+          onNavigateTo = { obj ->
+            showManageObjectsSheet = false
+            viewModel.selectDestination(obj.toLatLng(), obj.title)
+          },
+          onDeleteObject = { obj ->
+            viewModel.deleteMapObject(obj)
+          },
+          onAddNewObject = {
+            viewModel.openAddObjectDialog()
+          },
+          onDismiss = { showManageObjectsSheet = false }
+        )
+      }
 
       // Saved Places Modal Sheet
       if (showSavedPlacesSheet) {

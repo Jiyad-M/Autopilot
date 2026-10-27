@@ -5,9 +5,10 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [SavedPlaceEntity::class], version = 1, exportSchema = false)
+@Database(entities = [SavedPlaceEntity::class, MapObjectEntity::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
   abstract fun savedPlaceDao(): SavedPlaceDao
+  abstract fun mapObjectDao(): MapObjectDao
 
   companion object {
     @Volatile

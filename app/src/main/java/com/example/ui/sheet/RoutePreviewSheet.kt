@@ -70,7 +70,6 @@ fun RoutePreviewSheet(
   isCalculating: Boolean,
   onModeSelected: (TravelMode) -> Unit,
   onStartNavigation: () -> Unit,
-  onStartSimulation: () -> Unit,
   onSavePlace: () -> Unit,
   onCancel: () -> Unit,
   modifier: Modifier = Modifier
@@ -255,35 +254,17 @@ fun RoutePreviewSheet(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Dual Actions: "Start Navigation" (GPS) & "Simulate Route" (Demo drive)
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.spacedBy(10.dp)
+        Button(
+          onClick = onStartNavigation,
+          shape = RoundedCornerShape(14.dp),
+          colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+          modifier = Modifier
+            .fillMaxWidth()
+            .testTag("start_navigation_button")
         ) {
-          OutlinedButton(
-            onClick = onStartSimulation,
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier
-              .weight(1f)
-              .testTag("simulate_route_button")
-          ) {
-            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(4.dp))
-            Text("Simulate")
-          }
-
-          Button(
-            onClick = onStartNavigation,
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-            modifier = Modifier
-              .weight(1.3f)
-              .testTag("start_navigation_button")
-          ) {
-            Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(6.dp))
-            Text("Start GPS", fontWeight = FontWeight.Bold)
-          }
+          Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(20.dp))
+          Spacer(modifier = Modifier.width(8.dp))
+          Text("Start Navigation", fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }
       }
     }

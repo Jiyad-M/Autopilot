@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.api.OsmNavigationRepository
 import com.example.data.db.AppDatabase
+import com.example.data.db.MapObjectEntity
 import com.example.data.db.SavedPlaceEntity
 import com.example.data.location.LocationTracker
 import com.example.data.model.LatLng
@@ -13,7 +14,6 @@ import com.example.data.model.NavigationProgress
 import com.example.data.model.NavigationStatus
 import com.example.data.model.PlaceSearchResult
 import com.example.data.model.RouteInfo
-import com.example.data.model.RouteStep
 import com.example.data.model.TravelMode
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 
 data class NavigationUiState(
   val userLocation: LatLng = LatLng(37.7749, -122.4194),
@@ -37,15 +39,16 @@ data class NavigationUiState(
   val routeInfo: RouteInfo? = null,
   val navProgress: NavigationProgress? = null,
   val isCalculatingRoute: Boolean = false,
-  val isSimulating: Boolean = false,
-  val simulationSpeed: Float = 1.5f,
   val isMuted: Boolean = false,
   val isFollowingUser: Boolean = true,
   val searchQuery: String = "",
   val searchResults: List<PlaceSearchResult> = emptyList(),
   val isSearching: Boolean = false,
   val activeStepIndex: Int = 0,
-  val errorMessage: String? = null
+  val errorMessage: String? = null,
+  val selectedMapObject: MapObjectEntity? = null,
+  val isAddObjectDialogOpen: Boolean = false,
+  val pendingObjectLocation: LatLng? = null
 )
 
 class NavigationViewModel(application: Application) : AndroidViewModel(application) {
@@ -54,15 +57,17 @@ class NavigationViewModel(application: Application) : AndroidViewModel(applicati
   private val locationTracker = LocationTracker(application)
   private val database = AppDatabase.getDatabase(application)
   private val savedPlaceDao = database.savedPlaceDao()
+  private val mapObjectDao = database.mapObjectDao()
 
   val savedPlaces = savedPlaceDao.getAllPlaces()
+  val mapObjects = mapObjectDao.getAllObjects()
 
   private val _uiState = MutableStateFlow(NavigationUiState())
   val uiState: StateFlow<NavigationUiState> = _uiState.asStateFlow()
 
   private var locationJob: Job? = null
-  private var simulationJob: Job? = null
   private var searchDebounceJob: Job? = null
+  private var currentCachedObjects: List<MapObjectEntity> = emptyList()
 
   // Callback to Leaflet WebView
   var onMapCommand: ((String) -> Unit)? = null
@@ -70,6 +75,7 @@ class NavigationViewModel(application: Application) : AndroidViewModel(applicati
   init {
     initUserLocation()
     seedDefaultSavedPlaces()
+    observeMapObjects()
   }
 
   private fun initUserLocation() {
@@ -78,6 +84,33 @@ class NavigationViewModel(application: Application) : AndroidViewModel(applicati
       onMapCommand?.invoke("setUserPuck(${loc.latitude}, ${loc.longitude}, 0)")
       onMapCommand?.invoke("setCenter(${loc.latitude}, ${loc.longitude}, 15)")
     }
+  }
+
+  private fun observeMapObjects() {
+    viewModelScope.launch {
+      mapObjects.collect { objects ->
+        currentCachedObjects = objects
+        syncObjectsToMap(objects)
+      }
+    }
+  }
+
+  private fun syncObjectsToMap(objects: List<MapObjectEntity>) {
+    if (onMapCommand == null) return
+    val jsonArr = JSONArray()
+    objects.forEach { obj ->
+      val item = JSONObject()
+      item.put("id", obj.id)
+      item.put("title", obj.title)
+      item.put("description", obj.description)
+      item.put("objectType", obj.objectType)
+      item.put("latitude", obj.latitude)
+      item.put("longitude", obj.longitude)
+      item.put("radiusMeters", obj.radiusMeters)
+      item.put("colorHex", obj.colorHex)
+      jsonArr.put(item)
+    }
+    onMapCommand?.invoke("renderCustomObjects($jsonArr)")
   }
 
   fun startTrackingLocation() {
@@ -95,16 +128,14 @@ class NavigationViewModel(application: Application) : AndroidViewModel(applicati
             )
           }
 
-          if (!_uiState.value.isSimulating) {
-            onMapCommand?.invoke("setUserPuck(${newLatLng.latitude}, ${newLatLng.longitude}, $heading)")
-            if (_uiState.value.isFollowingUser) {
-              onMapCommand?.invoke("setCenter(${newLatLng.latitude}, ${newLatLng.longitude})")
-            }
+          onMapCommand?.invoke("updateUserPuck(${newLatLng.latitude}, ${newLatLng.longitude}, $heading)")
+          if (_uiState.value.isFollowingUser) {
+            onMapCommand?.invoke("setCenter(${newLatLng.latitude}, ${newLatLng.longitude})")
+          }
 
-            // If active real navigation, update progress
-            if (_uiState.value.navStatus == NavigationStatus.NAVIGATING) {
-              updateRealNavProgress(newLatLng, heading, location.speed * 3.6) // m/s to km/h
-            }
+          // If active real navigation, update progress
+          if (_uiState.value.navStatus == NavigationStatus.NAVIGATING) {
+            updateRealNavProgress(newLatLng, heading, location.speed * 3.6) // m/s to km/h
           }
         }
     }
@@ -115,6 +146,7 @@ class NavigationViewModel(application: Application) : AndroidViewModel(applicati
     onMapCommand?.invoke("setUserPuck(${loc.latitude}, ${loc.longitude}, ${_uiState.value.userHeading})")
     onMapCommand?.invoke("setCenter(${loc.latitude}, ${loc.longitude}, 15)")
     onMapCommand?.invoke("setTileLayer('${_uiState.value.mapTheme.id}')")
+    syncObjectsToMap(currentCachedObjects)
   }
 
   fun setMapTheme(theme: MapTheme) {
@@ -124,9 +156,82 @@ class NavigationViewModel(application: Application) : AndroidViewModel(applicati
 
   fun onMapClick(lat: Double, lng: Double) {
     val tappedLoc = LatLng(lat, lng)
+
+    // If currently creating an object, set location to tapped point
+    if (_uiState.value.isAddObjectDialogOpen) {
+      _uiState.update { it.copy(pendingObjectLocation = tappedLoc) }
+      return
+    }
+
     viewModelScope.launch {
       val placeName = repository.reverseGeocode(tappedLoc)
       selectDestination(tappedLoc, placeName)
+    }
+  }
+
+  fun onMapObjectClick(id: Long, title: String, type: String, lat: Double, lng: Double) {
+    val obj = currentCachedObjects.firstOrNull { it.id == id } ?: MapObjectEntity(
+      id = id,
+      title = title,
+      objectType = type,
+      latitude = lat,
+      longitude = lng
+    )
+    _uiState.update { it.copy(selectedMapObject = obj) }
+  }
+
+  fun clearSelectedMapObject() {
+    _uiState.update { it.copy(selectedMapObject = null) }
+  }
+
+  fun openAddObjectDialog(location: LatLng? = null) {
+    val targetLoc = location ?: _uiState.value.userLocation
+    _uiState.update {
+      it.copy(
+        isAddObjectDialogOpen = true,
+        pendingObjectLocation = targetLoc
+      )
+    }
+  }
+
+  fun closeAddObjectDialog() {
+    _uiState.update {
+      it.copy(
+        isAddObjectDialogOpen = false,
+        pendingObjectLocation = null
+      )
+    }
+  }
+
+  fun saveMapObject(
+    title: String,
+    description: String,
+    objectType: String,
+    latitude: Double,
+    longitude: Double,
+    radiusMeters: Double,
+    colorHex: String
+  ) {
+    viewModelScope.launch {
+      mapObjectDao.insertObject(
+        MapObjectEntity(
+          title = title.ifBlank { "Map Object" },
+          description = description,
+          objectType = objectType,
+          latitude = latitude,
+          longitude = longitude,
+          radiusMeters = radiusMeters,
+          colorHex = colorHex
+        )
+      )
+      closeAddObjectDialog()
+    }
+  }
+
+  fun deleteMapObject(obj: MapObjectEntity) {
+    viewModelScope.launch {
+      mapObjectDao.deleteObject(obj)
+      _uiState.update { it.copy(selectedMapObject = null) }
     }
   }
 
@@ -163,7 +268,6 @@ class NavigationViewModel(application: Application) : AndroidViewModel(applicati
     }
     selectDestination(result.location, result.name)
 
-    // Save to recents in DB
     viewModelScope.launch {
       savedPlaceDao.insertPlace(
         SavedPlaceEntity(
@@ -211,7 +315,6 @@ class NavigationViewModel(application: Application) : AndroidViewModel(applicati
           )
         }
 
-        // Draw on Leaflet Map
         val coordsJson = route.coordinates.joinToString(separator = ",", prefix = "[", postfix = "]") {
           "[${it.latitude}, ${it.longitude}]"
         }
@@ -228,104 +331,19 @@ class NavigationViewModel(application: Application) : AndroidViewModel(applicati
     }
   }
 
-  fun startNavigation(isSimulation: Boolean = false) {
+  fun startNavigation() {
     val route = _uiState.value.routeInfo ?: return
     if (route.steps.isEmpty() || route.coordinates.isEmpty()) return
 
     _uiState.update {
       it.copy(
         navStatus = NavigationStatus.NAVIGATING,
-        isSimulating = isSimulation,
         activeStepIndex = 0,
         isFollowingUser = true
       )
     }
 
-    if (isSimulation) {
-      startRouteSimulation(route)
-    } else {
-      startTrackingLocation()
-    }
-  }
-
-  private fun startRouteSimulation(route: RouteInfo) {
-    simulationJob?.cancel()
-    simulationJob = viewModelScope.launch {
-      val polyline = route.coordinates
-      if (polyline.isEmpty()) return@launch
-
-      val totalPoints = polyline.size
-      var currentIdx = 0
-      var currentStepIdx = 0
-
-      while (currentIdx < totalPoints && _uiState.value.navStatus == NavigationStatus.NAVIGATING) {
-        val currPt = polyline[currentIdx]
-        val nextPt = polyline.getOrNull(currentIdx + 1) ?: currPt
-        val heading = currPt.bearingTo(nextPt)
-
-        // Find active step
-        val step = route.steps.getOrNull(currentStepIdx) ?: route.steps.last()
-        val nextStep = route.steps.getOrNull(currentStepIdx + 1)
-        val distToStep = currPt.distanceTo(step.location)
-
-        if (distToStep < 25.0 && currentStepIdx < route.steps.size - 1) {
-          currentStepIdx++
-          _uiState.update { it.copy(activeStepIndex = currentStepIdx) }
-        }
-
-        // Calculate remaining distance & duration
-        var remDist = 0.0
-        for (k in currentIdx until totalPoints - 1) {
-          remDist += polyline[k].distanceTo(polyline[k + 1])
-        }
-        val speedMps = when (route.travelMode) {
-          TravelMode.DRIVING -> 14.0 * _uiState.value.simulationSpeed
-          TravelMode.CYCLING -> 5.0 * _uiState.value.simulationSpeed
-          TravelMode.WALKING -> 1.4 * _uiState.value.simulationSpeed
-        }
-        val remDur = if (speedMps > 0) remDist / speedMps else 0.0
-        val speedKmh = speedMps * 3.6
-
-        val progress = NavigationProgress(
-          currentStepIndex = currentStepIdx,
-          currentStep = route.steps.getOrElse(currentStepIdx) { route.steps.last() },
-          nextStep = route.steps.getOrNull(currentStepIdx + 1),
-          distanceToNextManeuverMeters = distToStep,
-          remainingDistanceMeters = remDist,
-          remainingDurationSeconds = remDur,
-          currentSpeedKmh = speedKmh,
-          currentHeading = heading,
-          currentLocation = currPt,
-          isSimulation = true
-        )
-
-        _uiState.update {
-          it.copy(
-            navProgress = progress,
-            userLocation = currPt,
-            userHeading = heading
-          )
-        }
-
-        // Send to map
-        onMapCommand?.invoke("updateUserPuck(${currPt.latitude}, ${currPt.longitude}, $heading)")
-        if (_uiState.value.isFollowingUser) {
-          onMapCommand?.invoke("setCenter(${currPt.latitude}, ${currPt.longitude})")
-        }
-
-        currentIdx++
-        val baseDelay = when (route.travelMode) {
-          TravelMode.DRIVING -> 400L
-          TravelMode.CYCLING -> 600L
-          TravelMode.WALKING -> 800L
-        }
-        val actualDelay = (baseDelay / _uiState.value.simulationSpeed).toLong().coerceAtLeast(100L)
-        delay(actualDelay)
-      }
-
-      // Reached destination!
-      _uiState.update { it.copy(navStatus = NavigationStatus.ARRIVED) }
-    }
+    startTrackingLocation()
   }
 
   private fun updateRealNavProgress(currentLoc: LatLng, heading: Float, speedKmh: Double) {
@@ -359,15 +377,10 @@ class NavigationViewModel(application: Application) : AndroidViewModel(applicati
       remainingDurationSeconds = estDuration,
       currentSpeedKmh = speedKmh.coerceAtLeast(0.0),
       currentHeading = heading,
-      currentLocation = currentLoc,
-      isSimulation = false
+      currentLocation = currentLoc
     )
 
     _uiState.update { it.copy(navProgress = progress) }
-  }
-
-  fun setSimulationSpeed(multiplier: Float) {
-    _uiState.update { it.copy(simulationSpeed = multiplier) }
   }
 
   fun toggleFollowUser() {
@@ -397,12 +410,10 @@ class NavigationViewModel(application: Application) : AndroidViewModel(applicati
   }
 
   fun stopNavigation() {
-    simulationJob?.cancel()
     _uiState.update {
       it.copy(
         navStatus = NavigationStatus.IDLE,
         navProgress = null,
-        isSimulating = false,
         destinationLocation = null,
         destinationName = null,
         routeInfo = null
@@ -434,7 +445,6 @@ class NavigationViewModel(application: Application) : AndroidViewModel(applicati
 
   private fun seedDefaultSavedPlaces() {
     viewModelScope.launch {
-      // Add standard quick shortcuts if empty
       savedPlaceDao.insertPlace(
         SavedPlaceEntity(
           id = 1,
@@ -461,7 +471,6 @@ class NavigationViewModel(application: Application) : AndroidViewModel(applicati
   override fun onCleared() {
     super.onCleared()
     locationJob?.cancel()
-    simulationJob?.cancel()
     searchDebounceJob?.cancel()
   }
 }

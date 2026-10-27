@@ -118,6 +118,23 @@
       animation: pulse-step 1s infinite alternate;
     }
 
+    /* Custom Added Map Objects */
+    .object-pin-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 2px solid #ffffff;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+    .object-pin-badge:active {
+      transform: scale(1.15);
+    }
+
     @keyframes pulse-step {
       from { transform: scale(0.9); }
       to { transform: scale(1.2); }
@@ -130,55 +147,39 @@
   <script>
     var map;
     var userMarker = null;
-    var userCone = null;
     var startMarker = null;
     var endMarker = null;
     var stepMarkers = [];
     var routePolylineBg = null;
     var routePolyline = null;
     var activeTileLayer = null;
+    var customObjectLayers = {};
 
     // Tile providers
     var tileProviders = {
       streets: {
         url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        options: {
-          maxZoom: 19,
-          attribution: '&copy; OpenStreetMap'
-        }
+        options: { maxZoom: 19, attribution: '&copy; OpenStreetMap' }
       },
       light: {
         url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-        options: {
-          maxZoom: 19,
-          attribution: '&copy; CARTO'
-        }
+        options: { maxZoom: 19, attribution: '&copy; CARTO' }
       },
       dark: {
         url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-        options: {
-          maxZoom: 19,
-          attribution: '&copy; CARTO'
-        }
+        options: { maxZoom: 19, attribution: '&copy; CARTO' }
       },
       satellite: {
         url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        options: {
-          maxZoom: 18,
-          attribution: '&copy; Esri World Imagery'
-        }
+        options: { maxZoom: 18, attribution: '&copy; Esri World Imagery' }
       },
       terrain: {
         url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-        options: {
-          maxZoom: 17,
-          attribution: '&copy; OpenTopoMap'
-        }
+        options: { maxZoom: 17, attribution: '&copy; OpenTopoMap' }
       }
     };
 
     function initMap() {
-      // Default to center of San Francisco / global fallback
       map = L.map('map', {
         center: [37.7749, -122.4194],
         zoom: 14,
@@ -186,10 +187,8 @@
         attributionControl: true
       });
 
-      // Set initial tile layer (voyager light for crisp, modern navigation look)
       setTileLayer('light');
 
-      // Click event
       map.on('click', function(e) {
         if (window.AndroidBridge && window.AndroidBridge.onMapClick) {
           window.AndroidBridge.onMapClick(e.latlng.lat, e.latlng.lng);
@@ -308,12 +307,10 @@
         var coords = (typeof coordsJson === 'string') ? JSON.parse(coordsJson) : coordsJson;
         if (!coords || coords.length === 0) return;
 
-        // Leaflet expects [lat, lng]
         var latLngs = coords.map(function(pt) {
           return [pt[0], pt[1]];
         });
 
-        // Background polyline for contrast
         routePolylineBg = L.polyline(latLngs, {
           color: '#0369a1',
           weight: 8,
@@ -322,7 +319,6 @@
           lineJoin: 'round'
         }).addTo(map);
 
-        // Foreground vibrant polyline
         routePolyline = L.polyline(latLngs, {
           color: '#38bdf8',
           weight: 5,
@@ -343,57 +339,6 @@
       }
     }
 
-    function setStepMarkers(stepsJson) {
-      clearStepMarkers();
-      try {
-        var steps = (typeof stepsJson === 'string') ? JSON.parse(stepsJson) : stepsJson;
-        if (!steps || !steps.length) return;
-
-        steps.forEach(function(step, idx) {
-          if (!step.location) return;
-          var markerHtml = '<div id="step-marker-' + idx + '" class="step-marker-dot"></div>';
-          var icon = L.divIcon({
-            className: 'step-marker-container',
-            html: markerHtml,
-            iconSize: [12, 12],
-            iconAnchor: [6, 6]
-          });
-          var marker = L.marker([step.location.lat, step.location.lng], { icon: icon });
-          marker.on('click', function() {
-            if (window.AndroidBridge && window.AndroidBridge.onStepMarkerClick) {
-              window.AndroidBridge.onStepMarkerClick(idx);
-            }
-          });
-          marker.addTo(map);
-          stepMarkers.push(marker);
-        });
-      } catch (e) {
-        console.error('Error setting step markers', e);
-      }
-    }
-
-    function highlightStepMarker(activeIdx) {
-      for (var i = 0; i < stepMarkers.length; i++) {
-        var el = document.getElementById('step-marker-' + i);
-        if (el) {
-          if (i === activeIdx) {
-            el.className = 'step-marker-active';
-          } else {
-            el.className = 'step-marker-dot';
-          }
-        }
-      }
-    }
-
-    function clearStepMarkers() {
-      if (stepMarkers && stepMarkers.length) {
-        stepMarkers.forEach(function(m) {
-          map.removeLayer(m);
-        });
-      }
-      stepMarkers = [];
-    }
-
     function clearRoute() {
       if (!map) return;
       if (routePolylineBg) {
@@ -404,7 +349,10 @@
         map.removeLayer(routePolyline);
         routePolyline = null;
       }
-      clearStepMarkers();
+      if (stepMarkers && stepMarkers.length) {
+        stepMarkers.forEach(function(m) { map.removeLayer(m); });
+        stepMarkers = [];
+      }
     }
 
     function clearAll() {
@@ -417,6 +365,84 @@
         map.removeLayer(endMarker);
         endMarker = null;
       }
+    }
+
+    // --- Custom Map Objects Management ---
+    function renderCustomObjects(objectsJson) {
+      if (!map) return;
+      clearCustomObjects();
+
+      try {
+        var objects = (typeof objectsJson === 'string') ? JSON.parse(objectsJson) : objectsJson;
+        if (!objects || !objects.length) return;
+
+        objects.forEach(function(obj) {
+          var color = obj.colorHex || '#0284c7';
+          var lat = obj.latitude;
+          var lng = obj.longitude;
+
+          if (obj.objectType === 'circle' || obj.objectType === 'zone') {
+            var radius = obj.radiusMeters || 150;
+            var circle = L.circle([lat, lng], {
+              radius: radius,
+              color: color,
+              weight: 2,
+              fillColor: color,
+              fillOpacity: 0.28
+            });
+
+            circle.on('click', function(e) {
+              L.DomEvent.stopPropagation(e);
+              if (window.AndroidBridge && window.AndroidBridge.onMapObjectClick) {
+                window.AndroidBridge.onMapObjectClick(obj.id, obj.title, obj.objectType, lat, lng);
+              }
+            });
+
+            circle.addTo(map);
+            customObjectLayers[obj.id] = circle;
+          } else {
+            // Marker / Hazard / POI
+            var iconSymbol = '📍';
+            if (obj.objectType === 'hazard') iconSymbol = '⚠️';
+            else if (obj.objectType === 'poi') iconSymbol = '⭐';
+            else if (obj.objectType === 'camera') iconSymbol = '📷';
+
+            var badgeHtml = '<div class="object-pin-badge" style="background-color:' + color + ';">' +
+              '<span style="font-size:16px;">' + iconSymbol + '</span>' +
+            '</div>';
+
+            var icon = L.divIcon({
+              className: 'custom-object-icon',
+              html: badgeHtml,
+              iconSize: [36, 36],
+              iconAnchor: [18, 18]
+            });
+
+            var marker = L.marker([lat, lng], { icon: icon });
+            marker.on('click', function(e) {
+              L.DomEvent.stopPropagation(e);
+              if (window.AndroidBridge && window.AndroidBridge.onMapObjectClick) {
+                window.AndroidBridge.onMapObjectClick(obj.id, obj.title, obj.objectType, lat, lng);
+              }
+            });
+
+            marker.addTo(map);
+            customObjectLayers[obj.id] = marker;
+          }
+        });
+      } catch (err) {
+        console.error('Error rendering custom objects:', err);
+      }
+    }
+
+    function clearCustomObjects() {
+      if (!map) return;
+      for (var id in customObjectLayers) {
+        if (customObjectLayers.hasOwnProperty(id)) {
+          map.removeLayer(customObjectLayers[id]);
+        }
+      }
+      customObjectLayers = {};
     }
 
     function zoomIn() {

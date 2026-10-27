@@ -21,7 +21,7 @@ import com.example.ui.viewmodel.NavigationViewModel
 class LeafletBridge(
   private val onReady: () -> Unit,
   private val onMapClick: (Double, Double) -> Unit,
-  private val onStepClick: (Int) -> Unit
+  private val onObjectClick: (Long, String, String, Double, Double) -> Unit
 ) {
   private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -36,8 +36,8 @@ class LeafletBridge(
   }
 
   @JavascriptInterface
-  fun onStepMarkerClick(index: Int) {
-    mainHandler.post { onStepClick(index) }
+  fun onMapObjectClick(id: Long, title: String, type: String, lat: Double, lng: Double) {
+    mainHandler.post { onObjectClick(id, title, type, lat, lng) }
   }
 }
 
@@ -66,7 +66,9 @@ fun LeafletMapView(
       val bridge = LeafletBridge(
         onReady = { viewModel.onMapReady() },
         onMapClick = { lat, lng -> viewModel.onMapClick(lat, lng) },
-        onStepClick = { /* preview step */ }
+        onObjectClick = { id, title, type, lat, lng ->
+          viewModel.onMapObjectClick(id, title, type, lat, lng)
+        }
       )
       addJavascriptInterface(bridge, "AndroidBridge")
 
