@@ -12,28 +12,90 @@
       height: 100%;
       margin: 0;
       padding: 0;
-      background-color: #f8fafc;
+      background-color: #e5e7eb;
       overflow: hidden;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
       -webkit-user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    /* Clean Zoom Controls in Top-Left (like screenshot) */
+    .leaflet-top.leaflet-left {
+      top: 110px;
+      left: 12px;
+    }
+    .leaflet-bar {
+      border: none !important;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18) !important;
+      border-radius: 12px !important;
+      overflow: hidden;
+    }
+    .leaflet-bar a {
+      background-color: #ffffff !important;
+      color: #1e293b !important;
+      border-bottom: 1px solid #f1f5f9 !important;
+      width: 38px !important;
+      height: 38px !important;
+      line-height: 38px !important;
+      font-size: 20px !important;
+      font-weight: bold !important;
+    }
+    .leaflet-bar a:hover {
+      background-color: #f8fafc !important;
     }
 
     .leaflet-control-attribution {
       font-size: 9px !important;
-      background: rgba(255, 255, 255, 0.8) !important;
+      background: rgba(255, 255, 255, 0.85) !important;
       color: #64748b !important;
       padding: 2px 6px !important;
       border-radius: 4px;
       margin: 4px !important;
     }
-    .leaflet-control-attribution a {
-      color: #0284c7 !important;
-      text-decoration: none;
+
+    /* Map Legend Overlay (Top Right, matching screenshot) */
+    .map-legend {
+      position: absolute;
+      top: 110px;
+      right: 12px;
+      background: rgba(15, 23, 42, 0.88);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: #f8fafc;
+      padding: 10px 14px;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+      z-index: 1000;
+      font-size: 11px;
+      pointer-events: auto;
+      min-width: 130px;
+    }
+    .legend-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .legend-row:last-child {
+      margin-bottom: 0;
+    }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+    .legend-line {
+      width: 14px;
+      height: 4px;
+      border-radius: 2px;
+      margin-right: 6px;
+      flex-shrink: 0;
     }
 
-    /* Custom Pulsing User Location Puck */
-    .user-puck-container {
+    /* Live GPS Driver Puck */
+    .driver-puck-container {
       position: relative;
       width: 44px;
       height: 44px;
@@ -41,67 +103,66 @@
       align-items: center;
       justify-content: center;
     }
-
-    .puck-heading-cone {
+    .driver-puck-pulse {
       position: absolute;
-      top: -12px;
-      left: 10px;
-      width: 24px;
-      height: 24px;
-      opacity: 0.6;
-      transform-origin: 50% 100%;
-      pointer-events: none;
-      transition: transform 0.2s ease-out;
+      width: 38px;
+      height: 38px;
+      background: rgba(16, 185, 129, 0.35);
+      border-radius: 50%;
+      animation: puck-pulse 2s infinite ease-out;
     }
-
-    .puck-pulse {
-      position: absolute;
+    .driver-puck-body {
+      position: relative;
       width: 32px;
       height: 32px;
-      background: rgba(14, 165, 233, 0.35);
+      background: #10b981;
+      border: 2.5px solid #ffffff;
       border-radius: 50%;
-      animation: puck-pulse-animation 2s infinite ease-out;
-    }
-
-    .puck-dot {
-      position: relative;
-      width: 16px;
-      height: 16px;
-      background: #0284c7;
-      border: 3px solid #ffffff;
-      border-radius: 50%;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-size: 16px;
       z-index: 2;
     }
 
-    @keyframes puck-pulse-animation {
-      0% {
-        transform: scale(0.6);
-        opacity: 0.8;
-      }
-      100% {
-        transform: scale(1.6);
-        opacity: 0;
-      }
+    @keyframes puck-pulse {
+      0% { transform: scale(0.7); opacity: 0.9; }
+      100% { transform: scale(1.6); opacity: 0; }
     }
 
-    /* Custom Pins */
-    .custom-pin {
+    /* Destination Stop Badge (Orange #1 from screenshot) */
+    .stop-badge {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
     }
-    .pin-shadow {
-      width: 12px;
-      height: 4px;
-      background: rgba(0, 0, 0, 0.3);
+    .stop-badge-circle {
+      width: 36px;
+      height: 36px;
+      background: #f59e0b;
+      border: 3px solid #ffffff;
       border-radius: 50%;
-      margin-top: -2px;
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #1e293b;
+      font-size: 14px;
+      font-weight: 900;
+    }
+    .stop-badge-shadow {
+      width: 14px;
+      height: 4px;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 50%;
+      margin-top: 2px;
       filter: blur(1px);
     }
 
-    /* Custom Map Objects */
+    /* Custom Map Objects Pin */
     .object-pin-badge {
       display: flex;
       align-items: center;
@@ -110,7 +171,7 @@
       height: 36px;
       border-radius: 50%;
       border: 2px solid #ffffff;
-      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
       cursor: pointer;
       transition: transform 0.15s ease;
     }
@@ -121,6 +182,26 @@
 </head>
 <body>
   <div id="map"></div>
+
+  <!-- Map Legend (matching user screenshot) -->
+  <div class="map-legend" id="mapLegend">
+    <div class="legend-row">
+      <div class="legend-dot" style="background:#10b981;"></div>
+      <span>Live GPS</span>
+    </div>
+    <div class="legend-row">
+      <div class="legend-dot" style="background:#f59e0b;"></div>
+      <span>Destination (#1)</span>
+    </div>
+    <div class="legend-row">
+      <div class="legend-dot" style="background:#0284c7;"></div>
+      <span>Map Objects</span>
+    </div>
+    <div class="legend-row">
+      <div class="legend-line" style="background:#ea580c;"></div>
+      <span>Best Route</span>
+    </div>
+  </div>
 
   <script>
     var map;
@@ -134,19 +215,34 @@
     var customObjectLayers = {};
 
     function initMap() {
-      // Default map view: Standard OpenStreetMap
+      // Initialize map with top-left zoom controls like screenshot
       map = L.map('map', {
         center: [37.7749, -122.4194],
-        zoom: 15,
-        zoomControl: false,
+        zoom: 14,
+        zoomControl: true,
         attributionControl: true
       });
 
-      // Default clean OpenStreetMap tile layer
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      // CartoDB Voyager: Clear roads, highways, city labels, terrain, and coastlines (exactly matching screenshot)
+      var voyagerLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        maxZoom: 20,
+        subdomains: 'abcd',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+      });
+
+      // Fallback OSM layer in case of network edge issues
+      var osmLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; OpenStreetMap contributors'
-      }).addTo(map);
+      });
+
+      voyagerLayer.on('tileerror', function() {
+        if (!map.hasLayer(osmLayer)) {
+          osmLayer.addTo(map);
+        }
+      });
+
+      voyagerLayer.addTo(map);
 
       map.on('click', function(e) {
         if (window.AndroidBridge && window.AndroidBridge.onMapClick) {
@@ -170,19 +266,15 @@
 
     function updateUserPuck(lat, lng, heading) {
       if (!map) return;
-      var headingAngle = heading || 0;
 
       if (!userMarker) {
-        var puckHtml = '<div class="user-puck-container">' +
-          '<svg class="puck-heading-cone" id="headingCone" viewBox="0 0 24 24">' +
-            '<path fill="#0284c7" d="M12 2 L22 22 L12 17 L2 22 Z"/>' +
-          '</svg>' +
-          '<div class="puck-pulse"></div>' +
-          '<div class="puck-dot"></div>' +
+        var puckHtml = '<div class="driver-puck-container">' +
+          '<div class="driver-puck-pulse"></div>' +
+          '<div class="driver-puck-body">🚗</div>' +
         '</div>';
 
         var puckIcon = L.divIcon({
-          className: 'custom-puck-icon',
+          className: 'custom-driver-puck',
           html: puckHtml,
           iconSize: [44, 44],
           iconAnchor: [22, 22]
@@ -192,14 +284,9 @@
       } else {
         userMarker.setLatLng([lat, lng]);
       }
-
-      var coneElem = document.getElementById('headingCone');
-      if (coneElem) {
-        coneElem.style.transform = 'rotate(' + headingAngle + 'deg)';
-      }
     }
 
-    // --- Live Ongoing Trip Trajectory ---
+    // --- Live Ongoing Trip Trajectory (Green) ---
     function addTripPoint(lat, lng) {
       if (!map) return;
       var pt = [lat, lng];
@@ -227,7 +314,7 @@
       }
     }
 
-    // --- Route Endpoints & Path ---
+    // --- Start & Destination Pins (Orange #1 Stop like screenshot) ---
     function setStartDestinationPins(startLat, startLng, endLat, endLng, startTitle, endTitle) {
       if (!map) return;
 
@@ -235,20 +322,15 @@
       if (endMarker) map.removeLayer(endMarker);
 
       if (startLat !== null && startLng !== null) {
-        var startHtml = '<div class="custom-pin">' +
-          '<svg width="32" height="38" viewBox="0 0 32 38" fill="none">' +
-            '<path d="M16 0C7.163 0 0 7.163 0 16C0 27 16 38 16 38C16 38 32 27 32 16C32 7.163 24.837 0 16 0Z" fill="#0284c7"/>' +
-            '<circle cx="16" cy="15" r="7" fill="#ffffff"/>' +
-            '<circle cx="16" cy="15" r="4" fill="#0284c7"/>' +
-          '</svg>' +
-          '<div class="pin-shadow"></div>' +
+        var startHtml = '<div class="driver-puck-container">' +
+          '<div class="driver-puck-body" style="background:#10b981;">🚚</div>' +
         '</div>';
 
         var startIcon = L.divIcon({
-          className: 'pin-start',
+          className: 'start-puck',
           html: startHtml,
-          iconSize: [32, 40],
-          iconAnchor: [16, 38]
+          iconSize: [40, 40],
+          iconAnchor: [20, 20]
         });
 
         startMarker = L.marker([startLat, startLng], { icon: startIcon }).addTo(map);
@@ -256,27 +338,25 @@
       }
 
       if (endLat !== null && endLng !== null) {
-        var endHtml = '<div class="custom-pin">' +
-          '<svg width="34" height="42" viewBox="0 0 32 38" fill="none">' +
-            '<path d="M16 0C7.163 0 0 7.163 0 16C0 27 16 38 16 38C16 38 32 27 32 16C32 7.163 24.837 0 16 0Z" fill="#ef4444"/>' +
-            '<circle cx="16" cy="15" r="7" fill="#ffffff"/>' +
-            '<path d="M14 11V19M14 11L19 13.5L14 16" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
-          '</svg>' +
-          '<div class="pin-shadow"></div>' +
+        // Orange #1 stop badge matching screenshot
+        var endHtml = '<div class="stop-badge">' +
+          '<div class="stop-badge-circle">#1</div>' +
+          '<div class="stop-badge-shadow"></div>' +
         '</div>';
 
         var endIcon = L.divIcon({
-          className: 'pin-end',
+          className: 'pin-end-stop',
           html: endHtml,
-          iconSize: [34, 42],
-          iconAnchor: [17, 40]
+          iconSize: [36, 42],
+          iconAnchor: [18, 40]
         });
 
         endMarker = L.marker([endLat, endLng], { icon: endIcon }).addTo(map);
-        if (endTitle) endMarker.bindPopup('<b>Destination:</b> ' + endTitle);
+        if (endTitle) endMarker.bindPopup('<b>Destination (#1):</b> ' + endTitle);
       }
     }
 
+    // --- Route Path (Warm Orange like screenshot's "Best First Leg") ---
     function drawRoute(coordsJson, fit) {
       if (!map) return;
       clearRoute();
@@ -287,17 +367,19 @@
 
         var latLngs = coords.map(function(pt) { return [pt[0], pt[1]]; });
 
+        // Dark amber/orange outer border
         routePolylineBg = L.polyline(latLngs, {
-          color: '#0369a1',
-          weight: 8,
-          opacity: 0.8,
+          color: '#9a3412',
+          weight: 9,
+          opacity: 0.85,
           lineCap: 'round',
           lineJoin: 'round'
         }).addTo(map);
 
+        // Vibrant orange core line matching screenshot
         routePolyline = L.polyline(latLngs, {
-          color: '#0284c7',
-          weight: 5,
+          color: '#ea580c',
+          weight: 6,
           opacity: 1.0,
           lineCap: 'round',
           lineJoin: 'round'
@@ -305,8 +387,8 @@
 
         if (fit) {
           map.fitBounds(routePolyline.getBounds(), {
-            paddingTopLeft: [40, 80],
-            paddingBottomRight: [40, 240],
+            paddingTopLeft: [50, 100],
+            paddingBottomRight: [50, 260],
             animate: true
           });
         }
