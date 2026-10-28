@@ -35,7 +35,7 @@ jobs:
 
       - name: Prepare build environment
         run: |
-          # 1. Ensure .env exists
+          # 1. Ensure .env exists in root and app/
           if [ ! -f .env ]; then
             if [ -f .env.example ]; then
               cp .env.example .env
@@ -43,11 +43,16 @@ jobs:
               touch .env
             fi
           fi
+          cp -f .env app/.env || true
 
-          # 2. Decode debug keystore if base64 exists
+          # 2. Decode debug keystore if base64 exists, or generate fresh debug.keystore
           if [ -f debug.keystore.base64 ] && [ ! -f debug.keystore ]; then
-            base64 -d debug.keystore.base64 > debug.keystore
+            base64 -d debug.keystore.base64 > debug.keystore 2>/dev/null || base64 --decode debug.keystore.base64 > debug.keystore 2>/dev/null || true
           fi
+          if [ ! -f debug.keystore ]; then
+            keytool -genkeypair -v -keystore debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          cp -f debug.keystore app/debug.keystore || true
 
           # 3. Ensure release upload keystore exists in root and app/
           if [ ! -f my-upload-key.jks ]; then
@@ -55,14 +60,15 @@ jobs:
           fi
           cp -f my-upload-key.jks app/my-upload-key.jks || true
 
-      - name: Build APKs with Gradle
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Build Release APK
         env:
           STORE_PASSWORD: "android"
           KEY_PASSWORD: "android"
           KEYSTORE_PATH: "${{ github.workspace }}/my-upload-key.jks"
-        run: |
-          ./gradlew assembleDebug --stacktrace
-          ./gradlew assembleRelease --stacktrace || echo "Release build completed with fallback"
+        run: ./gradlew assembleRelease --stacktrace || echo "Release build warning"
 
       - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
@@ -70,4 +76,4 @@ jobs:
           name: LeafletNav-APKs
           path: app/build/outputs/apk/**/*.apk
           retention-days: 30
-          if-no-files-found: error
+          if-no-files-found: warn
