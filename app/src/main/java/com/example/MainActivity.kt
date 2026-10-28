@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.NavigationStatus
 import com.example.ui.dialogs.AddMapObjectDialog
-import com.example.ui.dialogs.LayerSelectionDialog
 import com.example.ui.dialogs.ManageMapObjectsSheet
 import com.example.ui.dialogs.MapObjectDetailSheet
 import com.example.ui.map.LeafletMapView
@@ -42,6 +41,8 @@ import com.example.ui.search.SearchBarWithCategories
 import com.example.ui.sheet.RoutePreviewSheet
 import com.example.ui.sheet.SavedPlacesSheet
 import com.example.ui.theme.MyApplicationTheme
+import com.example.ui.trip.TripControlBar
+import com.example.ui.trip.TripSummaryDialog
 import com.example.ui.viewmodel.NavigationViewModel
 import kotlinx.coroutines.launch
 
@@ -69,7 +70,6 @@ fun LeafletNavigationApp(viewModel: NavigationViewModel) {
   val scope = rememberCoroutineScope()
   val snackbarHostState = remember { SnackbarHostState() }
 
-  var showLayersDialog by remember { mutableStateOf(false) }
   var showSavedPlacesSheet by remember { mutableStateOf(false) }
   var showManageObjectsSheet by remember { mutableStateOf(false) }
 
@@ -102,7 +102,8 @@ fun LeafletNavigationApp(viewModel: NavigationViewModel) {
     enabled = uiState.navStatus != NavigationStatus.IDLE ||
         uiState.searchResults.isNotEmpty() ||
         uiState.selectedMapObject != null ||
-        uiState.isAddObjectDialogOpen
+        uiState.isAddObjectDialogOpen ||
+        uiState.tripState.isActive
   ) {
     when {
       uiState.selectedMapObject != null -> {
@@ -110,6 +111,9 @@ fun LeafletNavigationApp(viewModel: NavigationViewModel) {
       }
       uiState.isAddObjectDialogOpen -> {
         viewModel.closeAddObjectDialog()
+      }
+      uiState.tripState.isActive -> {
+        viewModel.stopTrip()
       }
       uiState.navStatus == NavigationStatus.NAVIGATING -> {
         viewModel.stopNavigation()
@@ -134,7 +138,7 @@ fun LeafletNavigationApp(viewModel: NavigationViewModel) {
         .fillMaxSize()
         .padding(innerPadding)
     ) {
-      // Background Leaflet Map
+      // Default Leaflet Map View
       LeafletMapView(
         viewModel = viewModel,
         modifier = Modifier.fillMaxSize()
@@ -150,23 +154,46 @@ fun LeafletNavigationApp(viewModel: NavigationViewModel) {
           onResultSelected = { viewModel.selectSearchResult(it) },
           onCategorySelected = { viewModel.searchCategory(it) },
           onOpenSavedPlaces = { showSavedPlacesSheet = true },
-          onOpenLayers = { showLayersDialog = true },
           modifier = Modifier.align(Alignment.TopCenter)
         )
       }
 
-      // Map Controls (Zoom In/Out, Recenter, Layers, Add Object, Objects List)
+      // Map Controls (Zoom In/Out, Recenter, Add Object, Objects List)
       if (uiState.navStatus != NavigationStatus.NAVIGATING) {
         MapControlButtons(
           onZoomIn = { viewModel.zoomIn() },
           onZoomOut = { viewModel.zoomOut() },
           onRecenter = { viewModel.recenterMap() },
-          onOpenLayers = { showLayersDialog = true },
           onAddObject = { viewModel.openAddObjectDialog() },
           onOpenObjectsList = { showManageObjectsSheet = true },
           modifier = Modifier
             .align(Alignment.CenterEnd)
-            .padding(bottom = if (uiState.navStatus == NavigationStatus.ROUTE_PREVIEW) 260.dp else 40.dp)
+            .padding(
+              bottom = if (uiState.navStatus == NavigationStatus.ROUTE_PREVIEW) 260.dp
+              else if (uiState.tripState.isActive) 180.dp
+              else 80.dp
+            )
+        )
+      }
+
+      // Start Trip Button / On-going Trip KM Calculator HUD
+      if (uiState.navStatus == NavigationStatus.IDLE) {
+        TripControlBar(
+          tripState = uiState.tripState,
+          onStartTrip = { viewModel.startTrip() },
+          onPauseResumeTrip = { viewModel.pauseResumeTrip() },
+          onStopTrip = { viewModel.stopTrip() },
+          modifier = if (!uiState.tripState.isActive) {
+            Modifier
+              .align(Alignment.BottomCenter)
+              .navigationBarsPadding()
+              .padding(bottom = 24.dp)
+          } else {
+            Modifier
+              .align(Alignment.BottomCenter)
+              .navigationBarsPadding()
+              .padding(bottom = 12.dp)
+          }
         )
       }
 
@@ -270,12 +297,11 @@ fun LeafletNavigationApp(viewModel: NavigationViewModel) {
         )
       }
 
-      // Layer Selection Sheet
-      if (showLayersDialog) {
-        LayerSelectionDialog(
-          currentTheme = uiState.mapTheme,
-          onThemeSelected = { viewModel.setMapTheme(it) },
-          onDismiss = { showLayersDialog = false }
+      // Completed Trip Summary Modal
+      uiState.tripSummary?.let { summary ->
+        TripSummaryDialog(
+          summary = summary,
+          onDismiss = { viewModel.dismissTripSummary() }
         )
       }
     }

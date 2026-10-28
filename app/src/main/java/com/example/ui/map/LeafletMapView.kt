@@ -1,10 +1,14 @@
 package com.example.ui.map
 
 import android.annotation.SuppressLint
+import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -58,8 +62,21 @@ fun LeafletMapView(
         cacheMode = WebSettings.LOAD_DEFAULT
         allowFileAccess = true
         allowContentAccess = true
+        mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+        safeBrowsingEnabled = false
       }
-      webViewClient = WebViewClient()
+
+      webViewClient = object : WebViewClient() {
+        override fun onReceivedError(
+          view: WebView?,
+          request: WebResourceRequest?,
+          error: WebResourceError?
+        ) {
+          super.onReceivedError(view, request, error)
+          Log.w("LeafletMapView", "WebView resource error: ${error?.description}")
+        }
+      }
+
       webChromeClient = WebChromeClient()
 
       val bridge = LeafletBridge(

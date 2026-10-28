@@ -32,14 +32,6 @@ enum class TravelMode(val key: String, val label: String) {
   WALKING("walking", "Walk")
 }
 
-enum class MapTheme(val id: String, val title: String) {
-  LIGHT("light", "Clean Light"),
-  DARK("dark", "Dark Mode"),
-  STREETS("streets", "OSM Streets"),
-  SATELLITE("satellite", "Satellite"),
-  TERRAIN("terrain", "Outdoors Topo")
-}
-
 data class RouteStep(
   val instruction: String,
   val distanceMeters: Double,
@@ -85,4 +77,23 @@ data class NavigationProgress(
   val currentSpeedKmh: Double,
   val currentHeading: Float,
   val currentLocation: LatLng
+)
+
+data class TripState(
+  val isActive: Boolean = false,
+  val isPaused: Boolean = false,
+  val distanceMeters: Double = 0.0,
+  val elapsedSeconds: Long = 0L,
+  val currentSpeedKmh: Double = 0.0,
+  val averageSpeedKmh: Double = 0.0,
+  val maxSpeedKmh: Double = 0.0,
+  val pathPoints: List<LatLng> = emptyList()
+)
+
+data class TripSummary(
+  val totalDistanceKm: Double,
+  val durationFormatted: String,
+  val avgSpeedKmh: Double,
+  val maxSpeedKmh: Double,
+  val timestamp: Long = System.currentTimeMillis()
 )

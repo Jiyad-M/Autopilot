@@ -78,7 +78,6 @@ fun SearchBarWithCategories(
   onResultSelected: (PlaceSearchResult) -> Unit,
   onCategorySelected: (String) -> Unit,
   onOpenSavedPlaces: () -> Unit,
-  onOpenLayers: () -> Unit,
   modifier: Modifier = Modifier
 ) {
   Column(
@@ -148,18 +147,6 @@ fun SearchBarWithCategories(
             imageVector = Icons.Default.Bookmark,
             contentDescription = "Saved places",
             tint = MaterialTheme.colorScheme.primary
-          )
-        }
-
-        // Map Layers shortcut
-        IconButton(
-          onClick = onOpenLayers,
-          modifier = Modifier.testTag("layers_picker_button")
-        ) {
-          Icon(
-            imageVector = Icons.Default.Layers,
-            contentDescription = "Layers",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
           )
         }
       }

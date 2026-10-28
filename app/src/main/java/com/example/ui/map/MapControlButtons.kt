@@ -10,7 +10,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddLocation
-import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.FloatingActionButton
@@ -29,7 +28,6 @@ fun MapControlButtons(
   onZoomIn: () -> Unit,
   onZoomOut: () -> Unit,
   onRecenter: () -> Unit,
-  onOpenLayers: () -> Unit,
   onAddObject: () -> Unit,
   onOpenObjectsList: () -> Unit,
   modifier: Modifier = Modifier
@@ -65,20 +63,6 @@ fun MapControlButtons(
         .testTag("fab_view_objects")
     ) {
       Icon(Icons.AutoMirrored.Filled.List, contentDescription = "View Map Objects")
-    }
-
-    // Layers Button
-    FloatingActionButton(
-      onClick = onOpenLayers,
-      shape = CircleShape,
-      containerColor = MaterialTheme.colorScheme.surface,
-      contentColor = MaterialTheme.colorScheme.onSurface,
-      elevation = FloatingActionButtonDefaults.elevation(4.dp),
-      modifier = Modifier
-        .size(48.dp)
-        .testTag("fab_layers")
-    ) {
-      Icon(Icons.Default.Layers, contentDescription = "Map Layers")
     }
 
     // Zoom +/- combined card

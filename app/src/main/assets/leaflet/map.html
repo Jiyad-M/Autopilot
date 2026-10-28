@@ -12,7 +12,7 @@
       height: 100%;
       margin: 0;
       padding: 0;
-      background-color: #0f172a;
+      background-color: #f8fafc;
       overflow: hidden;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
@@ -21,14 +21,14 @@
 
     .leaflet-control-attribution {
       font-size: 9px !important;
-      background: rgba(15, 23, 42, 0.7) !important;
-      color: #94a3b8 !important;
+      background: rgba(255, 255, 255, 0.8) !important;
+      color: #64748b !important;
       padding: 2px 6px !important;
       border-radius: 4px;
       margin: 4px !important;
     }
     .leaflet-control-attribution a {
-      color: #38bdf8 !important;
+      color: #0284c7 !important;
       text-decoration: none;
     }
 
@@ -100,25 +100,8 @@
       margin-top: -2px;
       filter: blur(1px);
     }
-    .step-marker-dot {
-      width: 12px;
-      height: 12px;
-      background: #ffffff;
-      border: 3px solid #0284c7;
-      border-radius: 50%;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-    }
-    .step-marker-active {
-      width: 18px;
-      height: 18px;
-      background: #f59e0b;
-      border: 3px solid #ffffff;
-      border-radius: 50%;
-      box-shadow: 0 0 12px #f59e0b;
-      animation: pulse-step 1s infinite alternate;
-    }
 
-    /* Custom Added Map Objects */
+    /* Custom Map Objects */
     .object-pin-badge {
       display: flex;
       align-items: center;
@@ -127,17 +110,12 @@
       height: 36px;
       border-radius: 50%;
       border: 2px solid #ffffff;
-      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
       cursor: pointer;
       transition: transform 0.15s ease;
     }
     .object-pin-badge:active {
       transform: scale(1.15);
-    }
-
-    @keyframes pulse-step {
-      from { transform: scale(0.9); }
-      to { transform: scale(1.2); }
     }
   </style>
 </head>
@@ -149,45 +127,26 @@
     var userMarker = null;
     var startMarker = null;
     var endMarker = null;
-    var stepMarkers = [];
     var routePolylineBg = null;
     var routePolyline = null;
-    var activeTileLayer = null;
+    var tripPolyline = null;
+    var tripPoints = [];
     var customObjectLayers = {};
 
-    // Tile providers
-    var tileProviders = {
-      streets: {
-        url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        options: { maxZoom: 19, attribution: '&copy; OpenStreetMap' }
-      },
-      light: {
-        url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-        options: { maxZoom: 19, attribution: '&copy; CARTO' }
-      },
-      dark: {
-        url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-        options: { maxZoom: 19, attribution: '&copy; CARTO' }
-      },
-      satellite: {
-        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        options: { maxZoom: 18, attribution: '&copy; Esri World Imagery' }
-      },
-      terrain: {
-        url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-        options: { maxZoom: 17, attribution: '&copy; OpenTopoMap' }
-      }
-    };
-
     function initMap() {
+      // Default map view: Standard OpenStreetMap
       map = L.map('map', {
         center: [37.7749, -122.4194],
-        zoom: 14,
+        zoom: 15,
         zoomControl: false,
         attributionControl: true
       });
 
-      setTileLayer('light');
+      // Default clean OpenStreetMap tile layer
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
 
       map.on('click', function(e) {
         if (window.AndroidBridge && window.AndroidBridge.onMapClick) {
@@ -198,16 +157,6 @@
       if (window.AndroidBridge && window.AndroidBridge.onMapReady) {
         window.AndroidBridge.onMapReady();
       }
-    }
-
-    function setTileLayer(type) {
-      if (!tileProviders[type]) type = 'light';
-      if (activeTileLayer) {
-        map.removeLayer(activeTileLayer);
-      }
-      var cfg = tileProviders[type];
-      activeTileLayer = L.tileLayer(cfg.url, cfg.options);
-      activeTileLayer.addTo(map);
     }
 
     function setCenter(lat, lng, zoom) {
@@ -250,6 +199,35 @@
       }
     }
 
+    // --- Live Ongoing Trip Trajectory ---
+    function addTripPoint(lat, lng) {
+      if (!map) return;
+      var pt = [lat, lng];
+      tripPoints.push(pt);
+
+      if (!tripPolyline) {
+        tripPolyline = L.polyline(tripPoints, {
+          color: '#10b981',
+          weight: 6,
+          opacity: 0.9,
+          lineCap: 'round',
+          lineJoin: 'round'
+        }).addTo(map);
+      } else {
+        tripPolyline.setLatLngs(tripPoints);
+      }
+    }
+
+    function clearTripTrajectory() {
+      if (!map) return;
+      tripPoints = [];
+      if (tripPolyline) {
+        map.removeLayer(tripPolyline);
+        tripPolyline = null;
+      }
+    }
+
+    // --- Route Endpoints & Path ---
     function setStartDestinationPins(startLat, startLng, endLat, endLng, startTitle, endTitle) {
       if (!map) return;
 
@@ -307,9 +285,7 @@
         var coords = (typeof coordsJson === 'string') ? JSON.parse(coordsJson) : coordsJson;
         if (!coords || coords.length === 0) return;
 
-        var latLngs = coords.map(function(pt) {
-          return [pt[0], pt[1]];
-        });
+        var latLngs = coords.map(function(pt) { return [pt[0], pt[1]]; });
 
         routePolylineBg = L.polyline(latLngs, {
           color: '#0369a1',
@@ -320,7 +296,7 @@
         }).addTo(map);
 
         routePolyline = L.polyline(latLngs, {
-          color: '#38bdf8',
+          color: '#0284c7',
           weight: 5,
           opacity: 1.0,
           lineCap: 'round',
@@ -349,10 +325,6 @@
         map.removeLayer(routePolyline);
         routePolyline = null;
       }
-      if (stepMarkers && stepMarkers.length) {
-        stepMarkers.forEach(function(m) { map.removeLayer(m); });
-        stepMarkers = [];
-      }
     }
 
     function clearAll() {
@@ -367,7 +339,7 @@
       }
     }
 
-    // --- Custom Map Objects Management ---
+    // --- Custom Map Objects ---
     function renderCustomObjects(objectsJson) {
       if (!map) return;
       clearCustomObjects();
@@ -401,7 +373,6 @@
             circle.addTo(map);
             customObjectLayers[obj.id] = circle;
           } else {
-            // Marker / Hazard / POI
             var iconSymbol = '📍';
             if (obj.objectType === 'hazard') iconSymbol = '⚠️';
             else if (obj.objectType === 'poi') iconSymbol = '⭐';

@@ -9,12 +9,14 @@ import com.example.data.db.MapObjectEntity
 import com.example.data.db.SavedPlaceEntity
 import com.example.data.location.LocationTracker
 import com.example.data.model.LatLng
-import com.example.data.model.MapTheme
 import com.example.data.model.NavigationProgress
 import com.example.data.model.NavigationStatus
 import com.example.data.model.PlaceSearchResult
 import com.example.data.model.RouteInfo
 import com.example.data.model.TravelMode
+import com.example.data.model.TripState
+import com.example.data.model.TripSummary
+import com.example.ui.trip.formatTripTime
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +24,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -29,7 +32,6 @@ import org.json.JSONObject
 data class NavigationUiState(
   val userLocation: LatLng = LatLng(37.7749, -122.4194),
   val userHeading: Float = 0f,
-  val mapTheme: MapTheme = MapTheme.LIGHT,
   val navStatus: NavigationStatus = NavigationStatus.IDLE,
   val originName: String = "Current Location",
   val originLocation: LatLng = LatLng(37.7749, -122.4194),
@@ -48,7 +50,9 @@ data class NavigationUiState(
   val errorMessage: String? = null,
   val selectedMapObject: MapObjectEntity? = null,
   val isAddObjectDialogOpen: Boolean = false,
-  val pendingObjectLocation: LatLng? = null
+  val pendingObjectLocation: LatLng? = null,
+  val tripState: TripState = TripState(),
+  val tripSummary: TripSummary? = null
 )
 
 class NavigationViewModel(application: Application) : AndroidViewModel(application) {
@@ -67,6 +71,7 @@ class NavigationViewModel(application: Application) : AndroidViewModel(applicati
 
   private var locationJob: Job? = null
   private var searchDebounceJob: Job? = null
+  private var tripTimerJob: Job? = null
   private var currentCachedObjects: List<MapObjectEntity> = emptyList()
 
   // Callback to Leaflet WebView
@@ -121,6 +126,11 @@ class NavigationViewModel(application: Application) : AndroidViewModel(applicati
         .collect { location ->
           val newLatLng = LatLng(location.latitude, location.longitude)
           val heading = if (location.hasBearing()) location.bearing else _uiState.value.userHeading
+          val speedKmh = if (location.hasSpeed()) location.speed * 3.6 else 0.0
+
+          // Check if Trip is active and calculate KM
+          handleTripLocationUpdate(newLatLng, speedKmh)
+
           _uiState.update {
             it.copy(
               userLocation = newLatLng,
@@ -133,31 +143,135 @@ class NavigationViewModel(application: Application) : AndroidViewModel(applicati
             onMapCommand?.invoke("setCenter(${newLatLng.latitude}, ${newLatLng.longitude})")
           }
 
-          // If active real navigation, update progress
+          // If active real navigation, update route progress
           if (_uiState.value.navStatus == NavigationStatus.NAVIGATING) {
-            updateRealNavProgress(newLatLng, heading, location.speed * 3.6) // m/s to km/h
+            updateRealNavProgress(newLatLng, heading, speedKmh)
           }
         }
     }
+  }
+
+  // --- Trip / Odometer Feature ---
+  fun startTrip() {
+    val currentLoc = _uiState.value.userLocation
+    onMapCommand?.invoke("clearTripTrajectory()")
+    onMapCommand?.invoke("addTripPoint(${currentLoc.latitude}, ${currentLoc.longitude})")
+
+    _uiState.update {
+      it.copy(
+        tripState = TripState(
+          isActive = true,
+          isPaused = false,
+          distanceMeters = 0.0,
+          elapsedSeconds = 0L,
+          pathPoints = listOf(currentLoc)
+        ),
+        tripSummary = null
+      )
+    }
+
+    startTripTimer()
+  }
+
+  private fun startTripTimer() {
+    tripTimerJob?.cancel()
+    tripTimerJob = viewModelScope.launch {
+      while (isActive) {
+        delay(1000L)
+        if (_uiState.value.tripState.isActive && !_uiState.value.tripState.isPaused) {
+          _uiState.update { state ->
+            val newSeconds = state.tripState.elapsedSeconds + 1
+            val avgSpeed = if (newSeconds > 0) (state.tripState.distanceMeters / newSeconds) * 3.6 else 0.0
+            state.copy(
+              tripState = state.tripState.copy(
+                elapsedSeconds = newSeconds,
+                averageSpeedKmh = avgSpeed
+              )
+            )
+          }
+        }
+      }
+    }
+  }
+
+  private fun handleTripLocationUpdate(newLocation: LatLng, currentSpeedKmh: Double) {
+    val currentTrip = _uiState.value.tripState
+    if (!currentTrip.isActive || currentTrip.isPaused) return
+
+    val lastLocation = currentTrip.pathPoints.lastOrNull() ?: _uiState.value.userLocation
+    val deltaMeters = lastLocation.distanceTo(newLocation)
+
+    // Filter out GPS jitter (< 2 meters)
+    if (deltaMeters >= 2.0) {
+      val totalDistance = currentTrip.distanceMeters + deltaMeters
+      val newPoints = currentTrip.pathPoints + newLocation
+      val avgSpeed = if (currentTrip.elapsedSeconds > 0) (totalDistance / currentTrip.elapsedSeconds) * 3.6 else currentSpeedKmh
+      val maxSpeed = maxOf(currentTrip.maxSpeedKmh, currentSpeedKmh)
+
+      _uiState.update { state ->
+        state.copy(
+          tripState = state.tripState.copy(
+            distanceMeters = totalDistance,
+            currentSpeedKmh = currentSpeedKmh,
+            averageSpeedKmh = avgSpeed,
+            maxSpeedKmh = maxSpeed,
+            pathPoints = newPoints
+          )
+        )
+      }
+
+      // Draw point on Leaflet map
+      onMapCommand?.invoke("addTripPoint(${newLocation.latitude}, ${newLocation.longitude})")
+    } else {
+      _uiState.update { state ->
+        state.copy(
+          tripState = state.tripState.copy(currentSpeedKmh = currentSpeedKmh)
+        )
+      }
+    }
+  }
+
+  fun pauseResumeTrip() {
+    _uiState.update {
+      it.copy(tripState = it.tripState.copy(isPaused = !it.tripState.isPaused))
+    }
+  }
+
+  fun stopTrip() {
+    tripTimerJob?.cancel()
+    val trip = _uiState.value.tripState
+    val totalKm = trip.distanceMeters / 1000.0
+
+    val summary = TripSummary(
+      totalDistanceKm = totalKm,
+      durationFormatted = formatTripTime(trip.elapsedSeconds),
+      avgSpeedKmh = trip.averageSpeedKmh,
+      maxSpeedKmh = trip.maxSpeedKmh
+    )
+
+    _uiState.update {
+      it.copy(
+        tripState = TripState(isActive = false),
+        tripSummary = summary
+      )
+    }
+  }
+
+  fun dismissTripSummary() {
+    _uiState.update { it.copy(tripSummary = null) }
+    onMapCommand?.invoke("clearTripTrajectory()")
   }
 
   fun onMapReady() {
     val loc = _uiState.value.userLocation
     onMapCommand?.invoke("setUserPuck(${loc.latitude}, ${loc.longitude}, ${_uiState.value.userHeading})")
     onMapCommand?.invoke("setCenter(${loc.latitude}, ${loc.longitude}, 15)")
-    onMapCommand?.invoke("setTileLayer('${_uiState.value.mapTheme.id}')")
     syncObjectsToMap(currentCachedObjects)
-  }
-
-  fun setMapTheme(theme: MapTheme) {
-    _uiState.update { it.copy(mapTheme = theme) }
-    onMapCommand?.invoke("setTileLayer('${theme.id}')")
   }
 
   fun onMapClick(lat: Double, lng: Double) {
     val tappedLoc = LatLng(lat, lng)
 
-    // If currently creating an object, set location to tapped point
     if (_uiState.value.isAddObjectDialogOpen) {
       _uiState.update { it.copy(pendingObjectLocation = tappedLoc) }
       return
@@ -472,5 +586,6 @@ class NavigationViewModel(application: Application) : AndroidViewModel(applicati
     super.onCleared()
     locationJob?.cancel()
     searchDebounceJob?.cancel()
+    tripTimerJob?.cancel()
   }
 }
